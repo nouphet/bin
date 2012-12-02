@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+prog="go"
+config_file="$HOME/.goconfig"
+[[ -f $config_file ]] || touch $config_file
+
+function command_help {
+	echo "Quickly jump to the directory
+
+$ $prog <name>                   : Jump with the shortcut
+$ $prog add <name> <path-to-dir> : Add a new shortcut
+$ $prog add <name> here          : Add current directory as a new shortcut
+$ $prog list                     : Show all shortcuts"  >&2
+	exit 1
+}
+
+function command_add {
+	[[ $# -ne 2 ]] && command_help
+	name=$1
+	dir=$2
+	
+	[[ $dir == "here" ]] && dir=$(pwd)
+	
+	if [ ! -d $dir ]
+	then
+		echo "No such a directory: $dir" >&2
+		exit 1
+	fi
+	
+	dir=$(php -r "echo realpath('$dir');")
+	
+	if [ $(shortcut_exists $name) -eq 1 ]
+	then
+		echo "That shortcut '$name' has already exists. Try other." >&2
+		exit 1
+	fi
+	
+	echo "shortcut $name $dir" >> $config_file
+	echo "New shortcut added."  >&2
+}
+
+function command_default {
+	local name=$1
+	local dir="" # 戻り値格納用
+	source $config_file # これでshortcut関数が実行されるはず
+	
+	if [ $dir ]
+	then
+		echo "$dir"
+	else
+		echo "No such a shortcut: $name" >&2
+		exit 1
+	fi
+}
+
+function command_list {
+	cat $config_file >&2
+}
+
+function command_names {
+	names=""
+
+	while read line
+	do
+		eval $line
+		names="$names $_name"
+		
+	done < $config_file
+	
+	echo $names
+}
+
+function shortcut_exists {
+	local name=$1
+	local dir=""
+	source $config_file # これでshortcut関数が実行されるはず
+	if [ $dir ]
+	then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+function shortcut {
+	_name=$1
+
+	if [ "$_name" == "$name" ]
+	then
+		dir=$2
+	else
+		_dir=$2
+	fi
+}
+
+if [ $# -eq 0 ]
+then
+	command_help
+	return
+fi
+
+case $1 in
+	"add") command_add $2 $3;;
+	"help") command_help;;
+	"list") command_list;;
+	"names") command_names;;
+	*) command_default $1;;
+esac
